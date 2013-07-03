@@ -1,0 +1,11 @@
+## Interface: 20400
+## Title: ChannelVote
+## Notes: Allows channel ban, kick and mute votes to be carried out.
+## Author: Siarkowy
+## X-License: BSD-2.0
+## SavedVariables: ChannelVoteDB
+## OptionalDeps: Ace3
+## Version: 1.0
+
+core.lua
+slash.lua
