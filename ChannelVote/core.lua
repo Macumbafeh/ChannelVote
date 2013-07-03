@@ -35,7 +35,6 @@ local ActionToFunc = {
 -- Ace3 ------------------------------------------------------------------------
 
 function Vote:OnInitialize()
-    self.owners = {}
     self.recentvotes = {}
     self.votes = {}
 
@@ -81,13 +80,6 @@ Square braces represent optional parameters.]],
 end
 
 function Vote:OnEnable()
-    -- owner detection
-    self:RegisterEvent("CHANNEL_ROSTER_UPDATE")
-    self:RegisterEvent("CHANNEL_COUNT_UPDATE", "CHANNEL_ROSTER_UPDATE")
-    self:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE_USER")
-    self:ScheduleTimer("QueryChannelOwners", 1)
-
-    -- channel msg event
     self:RegisterEvent("CHAT_MSG_CHANNEL")
 end
 
@@ -100,6 +92,37 @@ function Vote:OnSlashCommand(input)
 end
 
 -- Utils -----------------------------------------------------------------------
+
+function Vote:GetChannelInternalId(chan)
+    for i = 1, GetNumDisplayChannels() do
+        if GetChannelDisplayInfo(i) == chan then
+            return i
+        end
+    end
+
+    return nil
+end
+
+function Vote:GetChannelOwner(chan)
+    local cid = self:GetChannelInternalId(chan)
+
+    if not cid then
+        return
+    end
+
+    local i, player, owner = 0
+
+    repeat
+        i = i + 1
+        player, owner = GetChannelRosterInfo(cid, i)
+
+        if owner then
+            return player
+        end
+    until not player
+
+    return nil
+end
 
 function Vote:IsFriend(player)
     for i = 1, GetNumFriends() do
@@ -125,15 +148,6 @@ function Vote:IsGuildMember(player)
     return false
 end
 
-function Vote:QueryChannelOwners()
-    for i = 1, GetNumDisplayChannels() do
-        local name, header = GetChannelDisplayInfo(i)
-        if not header then
-            DisplayChannelOwner(i)
-        end
-    end
-end
-
 function Vote:SendChatMessage(distr, ...)
     local msg, target
 
@@ -154,18 +168,6 @@ end
 
 -- Events ----------------------------------------------------------------------
 
-function Vote:CHANNEL_ROSTER_UPDATE(event, cid, max)
-    local chan, _, _, _, count = GetChannelDisplayInfo(cid)
-    local name, owner
-    for i = 1, (max or count) do
-        name, owner = GetChannelRosterInfo(cid, i)
-        if owner then
-            self.owners[chan] = name
-            return
-        end
-    end
-end
-
 function Vote:CHAT_MSG_CHANNEL(event, msg, author, _, _, _, _, _, _, chan)
     if not self.db.profile.channels[chan] then return end
 
@@ -177,7 +179,7 @@ function Vote:CHAT_MSG_CHANNEL(event, msg, author, _, _, _, _, _, _, chan)
     elseif not action then
         return
 
-    elseif self.owners[chan] ~= UnitName("player") then
+    elseif self:GetChannelOwner(chan) ~= UnitName("player") then
         return
 
     elseif self.db.profile.guildonly and not (
@@ -212,12 +214,6 @@ function Vote:CHAT_MSG_CHANNEL(event, msg, author, _, _, _, _, _, _, chan)
     elseif action == "votecancel" and self.vote and (author == self.author or author == UnitName("player")) then
         self:CancelVote()
 
-    end
-end
-
-function Vote:CHAT_MSG_CHANNEL_NOTICE_USER(event, type, player, _, _, _, _, _, _, chan)
-    if type == "OWNER_CHANGED" or type == "CHANNEL_OWNER" then
-        self.owners[chan] = player
     end
 end
 
